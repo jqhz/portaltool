@@ -4,7 +4,7 @@
 
 In Minecraft Java 1.16.1 Speedrunning, runners use this strategy known as 'preemptive' where you can use the pie chart to get a block entities spike on the pie chart when the subchunk containing the silverfish spawner from the portal room is rendered. Basically, this tool creates a 9x9 square grid of 16x16 'blocks' with the center square always being our start when we begin scanning from starter 5-way. Each square represents a chunk that the portal room has potential to be in.
 
-When runners press F3+C, the position (player coordinates + looking angle) are copied to the clipboard which our program can then use to draw lines on the window with regards to the looking angle from the clipboard. When a captured line goes through a chunk (square on the grid), the square changes color to a yellow, and if 2 or more lines intersect a grid square, the darker it gets, like a heatmap. Since F3 angle use a wrapped system (-180 to 180) and the f3 + c coords use an unwrapped system (-infinity to +infinity). We can use the formula ((angle + 360) mod 360) to convert F3+C looking angle to the angle from F3 to use to draw the lines on our grid.
+When runners press F3+C, the position (player coordinates + looking angle) are copied to the clipboard which our program can then use to draw lines on the window with regards to the looking angle from the clipboard. When a captured line goes through a chunk (square on the grid), the square changes color to a yellow, and if 2 or more lines intersect a grid square, the darker it gets, like a heatmap. Since F3 angle use a wrapped system (-180 to 180) and the F3+C coords use an unwrapped system (-infinity to +infinity). We can use the formula ((angle + 360) mod 360) to convert F3+C looking angle to the angle from F3 to use to draw the lines on our grid.
 
 -0°/0° - South (+Z)
 
@@ -26,7 +26,7 @@ Grid is South-based 0° oriented meaning that the top of the grid is South, righ
 
 ## References/Inspiration
 
-[Ninjabrain bot](https://github.com/Ninjabrain1/Ninjabrain-Bot) - Understand how to capture the F3+C input from clipboard to abstract the looking angle
+[Ninjabrain Bot](https://github.com/Ninjabrain1/Ninjabrain-Bot) - Understand how to capture the F3+C input from clipboard to abstract the looking angle
 
 ## Tech Stack
 
