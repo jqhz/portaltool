@@ -10,6 +10,7 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
+import javax.swing.JComboBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -59,6 +60,22 @@ public final class MainFrame extends JFrame {
         title.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 16));
         title.setBorder(new EmptyBorder(0, 16, 0, 0));
         header.add(title, BorderLayout.WEST);
+
+        JComboBox<FrustumPreset> frustumSelector = new JComboBox<>(FrustumPreset.values());
+        frustumSelector.setSelectedItem(model.getFrustumPreset());
+        frustumSelector.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 13));
+        frustumSelector.addActionListener(
+                e -> {
+                    FrustumPreset selected = (FrustumPreset) frustumSelector.getSelectedItem();
+                    if (selected != null) {
+                        model.setFrustumPreset(selected);
+                        gridPanel.refresh();
+                    }
+                });
+        JPanel settingsRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+        settingsRow.setBackground(new Color(22, 22, 26));
+        settingsRow.add(frustumSelector);
+        header.add(settingsRow, BorderLayout.CENTER);
 
         JButton closeButton = new JButton("X");
         closeButton.setForeground(new Color(200, 200, 205));

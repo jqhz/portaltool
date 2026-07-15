@@ -19,6 +19,7 @@ public final class GridModel {
     private final List<ScanLine> scanLines = new ArrayList<>();
     private Integer anchorChunkX;
     private Integer anchorChunkZ;
+    private FrustumPreset frustumPreset = FrustumPreset.QUAKE_1080P;
 
     public synchronized void addCapture(F3CParser.F3CReading reading) {
         int chunkX = F3CParser.chunkCoord(reading.x());
@@ -42,7 +43,31 @@ public final class GridModel {
         double angle = F3CParser.toGridAngle(reading.horizontalAngle());
 
         scanLines.add(new ScanLine(originCol, originRow, angle));
-        markChunksAlongLine(originCol, originRow, angle);
+        markChunksInFrustum(originCol, originRow, angle, frustumPreset.halfAngleDegrees());
+    }
+
+    public synchronized void setFrustumPreset(FrustumPreset preset) {
+        if (preset == null || preset == frustumPreset) {
+            return;
+        }
+        frustumPreset = preset;
+        recalculateHitCounts();
+    }
+
+    public synchronized FrustumPreset getFrustumPreset() {
+        return frustumPreset;
+    }
+
+    private void recalculateHitCounts() {
+        for (int row = 0; row < SIZE; row++) {
+            for (int col = 0; col < SIZE; col++) {
+                hitCounts[row][col] = 0;
+            }
+        }
+        double halfAngle = frustumPreset.halfAngleDegrees();
+        for (ScanLine line : scanLines) {
+            markChunksInFrustum(line.originCol(), line.originRow(), line.angleDegrees(), halfAngle);
+        }
     }
 
     public synchronized void reset() {
@@ -68,18 +93,107 @@ public final class GridModel {
         return anchorChunkX != null;
     }
 
-    private void markChunksAlongLine(double originCol, double originRow, double angleDeg) {
-        double radians = Math.toRadians(angleDeg);
-        double dirCol = Math.sin(radians);
-        double dirRow = -Math.cos(radians);
-
+    private void markChunksInFrustum(
+            double originCol, double originRow, double centerAngleDeg, double halfAngleDeg) {
         for (int col = 0; col < SIZE; col++) {
             for (int row = 0; row < SIZE; row++) {
-                if (lineIntersectsCell(originCol, originRow, dirCol, dirRow, col, row)) {
+                if (wedgeIntersectsCell(originCol, originRow, centerAngleDeg, halfAngleDeg, col, row)) {
                     hitCounts[row][col]++;
                 }
             }
         }
+    }
+
+    private static boolean wedgeIntersectsCell(
+            double originCol,
+            double originRow,
+            double centerAngleDeg,
+            double halfAngleDeg,
+            int cellCol,
+            int cellRow) {
+        if (originCol >= cellCol
+                && originCol < cellCol + 1.0
+                && originRow >= cellRow
+                && originRow < cellRow + 1.0) {
+            return true;
+        }
+
+        double minCol = cellCol;
+        double maxCol = cellCol + 1.0;
+        double minRow = cellRow;
+        double maxRow = cellRow + 1.0;
+        double[][] samplePoints = {
+            {minCol, minRow},
+            {maxCol, minRow},
+            {maxCol, maxRow},
+            {minCol, maxRow},
+            {(minCol + maxCol) / 2.0, minRow},
+            {(minCol + maxCol) / 2.0, maxRow},
+            {minCol, (minRow + maxRow) / 2.0},
+            {maxCol, (minRow + maxRow) / 2.0},
+            {(minCol + maxCol) / 2.0, (minRow + maxRow) / 2.0}
+        };
+
+        for (double[] point : samplePoints) {
+            if (pointInForwardWedge(
+                    originCol, originRow, centerAngleDeg, halfAngleDeg, point[0], point[1])) {
+                return true;
+            }
+        }
+
+        double leftAngle = centerAngleDeg - halfAngleDeg;
+        double rightAngle = centerAngleDeg + halfAngleDeg;
+        double leftRadians = Math.toRadians(leftAngle);
+        double rightRadians = Math.toRadians(rightAngle);
+        double leftDirCol = Math.sin(leftRadians);
+        double leftDirRow = -Math.cos(leftRadians);
+        double rightDirCol = Math.sin(rightRadians);
+        double rightDirRow = -Math.cos(rightRadians);
+
+        return lineIntersectsCell(originCol, originRow, leftDirCol, leftDirRow, cellCol, cellRow)
+                || lineIntersectsCell(originCol, originRow, rightDirCol, rightDirRow, cellCol, cellRow);
+    }
+
+    private static boolean pointInForwardWedge(
+            double originCol,
+            double originRow,
+            double centerAngleDeg,
+            double halfAngleDeg,
+            double pointCol,
+            double pointRow) {
+        double deltaCol = pointCol - originCol;
+        double deltaRow = pointRow - originRow;
+        double centerRadians = Math.toRadians(centerAngleDeg);
+        double forwardCol = Math.sin(centerRadians);
+        double forwardRow = -Math.cos(centerRadians);
+        if (deltaCol * forwardCol + deltaRow * forwardRow <= 1e-12) {
+            return false;
+        }
+        double pointAngle = angleToPoint(originCol, originRow, pointCol, pointRow);
+        return isAngleInWedge(pointAngle, centerAngleDeg, halfAngleDeg);
+    }
+
+    private static double angleToPoint(
+            double originCol, double originRow, double pointCol, double pointRow) {
+        double deltaCol = pointCol - originCol;
+        double deltaRow = pointRow - originRow;
+        return normalizeAngle(Math.toDegrees(Math.atan2(deltaCol, -deltaRow)));
+    }
+
+    private static boolean isAngleInWedge(double pointAngle, double centerAngle, double halfAngle) {
+        double diff = normalizeAngle(pointAngle - centerAngle);
+        if (diff > 180.0) {
+            diff -= 360.0;
+        }
+        return Math.abs(diff) <= halfAngle + 1e-9;
+    }
+
+    private static double normalizeAngle(double degrees) {
+        double wrapped = degrees % 360.0;
+        if (wrapped < 0.0) {
+            wrapped += 360.0;
+        }
+        return wrapped;
     }
 
     private static boolean lineIntersectsCell(

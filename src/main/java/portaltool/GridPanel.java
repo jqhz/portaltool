@@ -6,6 +6,7 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.Polygon;
 import java.awt.RenderingHints;
 import java.util.List;
 import javax.swing.JPanel;
@@ -16,7 +17,9 @@ public final class GridPanel extends JPanel {
     private static final Color CENTER_FILL = new Color(55, 55, 60);
     private static final Color EMPTY_FILL = new Color(35, 35, 40);
     private static final Color LABEL_COLOR = new Color(170, 170, 175);
-    private static final Color LINE_COLOR = new Color(120, 200, 255, 180);
+    private static final Color FRUSTUM_FILL = new Color(120, 200, 255, 70);
+    private static final Color FRUSTUM_EDGE = new Color(120, 200, 255, 160);
+    private static final Color CENTER_LINE = new Color(255, 255, 255, 220);
 
     private final GridModel model;
 
@@ -55,21 +58,12 @@ public final class GridPanel extends JPanel {
             }
 
             List<GridModel.ScanLine> lines = model.getScanLines();
+            FrustumPreset preset = model.getFrustumPreset();
             if (!lines.isEmpty()) {
                 double extent = cell * GridModel.SIZE * 1.5;
-                g2.setStroke(new BasicStroke(2f));
+                double halfAngle = preset.halfAngleDegrees();
                 for (GridModel.ScanLine line : lines) {
-                    double startX = originX + line.originCol() * cell;
-                    double startY = originY + line.originRow() * cell;
-                    double radians = Math.toRadians(line.angleDegrees());
-                    double dx = Math.sin(radians) * extent;
-                    double dy = -Math.cos(radians) * extent;
-                    g2.setColor(LINE_COLOR);
-                    g2.drawLine(
-                            (int) Math.round(startX),
-                            (int) Math.round(startY),
-                            (int) Math.round(startX + dx),
-                            (int) Math.round(startY + dy));
+                    drawFrustum(g2, line, halfAngle, extent, originX, originY, cell);
                 }
             }
         }
@@ -107,6 +101,52 @@ public final class GridPanel extends JPanel {
         }
         int red = Math.min(255, 200 + (hits - 3) * 18);
         return new Color(red, 55, 45);
+    }
+
+    private static void drawFrustum(
+            Graphics2D g2,
+            GridModel.ScanLine line,
+            double halfAngleDegrees,
+            double extent,
+            int originX,
+            int originY,
+            int cell) {
+        double startX = originX + line.originCol() * cell;
+        double startY = originY + line.originRow() * cell;
+        double centerAngle = line.angleDegrees();
+        double leftAngle = centerAngle - halfAngleDegrees;
+        double rightAngle = centerAngle + halfAngleDegrees;
+
+        double[] leftEnd = rayEndpoint(startX, startY, leftAngle, extent);
+        double[] rightEnd = rayEndpoint(startX, startY, rightAngle, extent);
+        double[] centerEnd = rayEndpoint(startX, startY, centerAngle, extent);
+
+        Polygon triangle = new Polygon();
+        triangle.addPoint((int) Math.round(startX), (int) Math.round(startY));
+        triangle.addPoint((int) Math.round(leftEnd[0]), (int) Math.round(leftEnd[1]));
+        triangle.addPoint((int) Math.round(rightEnd[0]), (int) Math.round(rightEnd[1]));
+
+        g2.setColor(FRUSTUM_FILL);
+        g2.fillPolygon(triangle);
+
+        g2.setStroke(new BasicStroke(1.5f));
+        g2.setColor(FRUSTUM_EDGE);
+        g2.drawPolygon(triangle);
+
+        g2.setStroke(new BasicStroke(2f));
+        g2.setColor(CENTER_LINE);
+        g2.drawLine(
+                (int) Math.round(startX),
+                (int) Math.round(startY),
+                (int) Math.round(centerEnd[0]),
+                (int) Math.round(centerEnd[1]));
+    }
+
+    private static double[] rayEndpoint(double startX, double startY, double angleDegrees, double extent) {
+        double radians = Math.toRadians(angleDegrees);
+        double dx = Math.sin(radians) * extent;
+        double dy = -Math.cos(radians) * extent;
+        return new double[] {startX + dx, startY + dy};
     }
 
     private void drawDirectionLabels(Graphics2D g2, int originX, int originY, int cell, int size) {
